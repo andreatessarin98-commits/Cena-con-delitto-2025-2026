@@ -394,8 +394,8 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
     const getGameState = () => {
       try {
         const data = localStorage.getItem(STORAGE_KEY);
-        return data ? JSON.parse(data) : { fase: 0, avviato: false, countdownEnd: null };
-      } catch { return { fase: 0, avviato: false, countdownEnd: null }; }
+        return data ? JSON.parse(data) : { fase: 0, avviato: false, rivelato: false };
+      } catch { return { fase: 0, avviato: false, rivelato: false }; }
     };
 
     const setGameState = (state) => {
@@ -679,9 +679,8 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
       const [notifica, setNotifica] = useState('');
       const [tab, setTab] = useState('scheda');
       const [letto, setLetto] = useState(false);
-      const [showCountdown, setShowCountdown] = useState(false);
 
-      const { fase, avviato, countdownEnd } = gameState;
+      const { fase, avviato } = gameState;
       const isMaster = utente.isMaster;
       const votaOk = fase >= 4;
 
@@ -691,6 +690,14 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
           const newState = getGameState();
           setLocalGameState(prev => {
             if (JSON.stringify(prev) !== JSON.stringify(newState)) {
+              // Se il gioco è appena stato avviato, mostra l'intro a tutti (non solo al master)
+              if (newState.avviato && !prev.avviato && !isMaster) {
+                setShowIntro(true);
+              }
+              // Se l'assassino è stato rivelato, mostra la rivelazione a tutti
+              if (newState.rivelato && !prev.rivelato && !isMaster) {
+                setShowRiv(true);
+              }
               // Notifica se c'è un nuovo indizio
               if (newState.fase > prev.fase && newState.fase > 0) {
                 setNotifica(`📩 Indizio #${newState.fase} disponibile!`);
@@ -701,14 +708,9 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
             }
             return prev;
           });
-          
-          // Controlla countdown
-          if (newState.countdownEnd && Date.now() < newState.countdownEnd) {
-            setShowCountdown(true);
-          }
         }, 1000);
         return () => clearInterval(poll);
-      }, []);
+      }, [isMaster]);
 
       // Salva appunti
       useEffect(() => {
@@ -716,14 +718,16 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
       }, [appunti, utente.personaggio.nome]);
 
       const handleAvvia = () => {
+        // Prima salva lo stato come avviato
+        const newState = { ...getGameState(), avviato: true };
+        setGameState(newState);
+        setLocalGameState(newState);
+        // Poi mostra l'intro
         setShowIntro(true);
       };
 
       const handleIntroComplete = () => {
         setShowIntro(false);
-        const newState = { ...getGameState(), avviato: true };
-        setGameState(newState);
-        setLocalGameState(newState);
       };
 
       const handleRilasciaIndizio = () => {
@@ -738,14 +742,18 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
         setTimeout(() => setNotifica(''), 4000);
       };
 
-      const handleCountdownComplete = useCallback(() => {
-        setShowCountdown(false);
-      }, []);
-
-      const handleReset = () => {
-        const newState = { fase: 0, avviato: false, countdownEnd: null };
+      const handleRivela = () => {
+        const newState = { ...getGameState(), rivelato: true };
         setGameState(newState);
         setLocalGameState(newState);
+        setShowRiv(true);
+      };
+
+      const handleReset = () => {
+        const newState = { fase: 0, avviato: false, rivelato: false };
+        setGameState(newState);
+        setLocalGameState(newState);
+        setShowRiv(false);
         setNotifica('🔄 Gioco resettato!');
         setTimeout(() => setNotifica(''), 3000);
       };
@@ -790,7 +798,6 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
 
       if (showIntro) return <VideoIntro onComplete={handleIntroComplete} />;
       if (showRiv) return <VideoRivelazione onClose={() => setShowRiv(false)} />;
-      if (showCountdown && countdownEnd) return <Countdown endTime={countdownEnd} onComplete={handleCountdownComplete} />;
 
       return (
         <div className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 pb-16">
@@ -822,7 +829,7 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
                 giocoAvviato={avviato}
                 onAvvia={handleAvvia}
                 onIndizio={handleRilasciaIndizio}
-                onRivela={() => setShowRiv(true)}
+                onRivela={handleRivela}
                 onReset={handleReset}
               />
             )}
