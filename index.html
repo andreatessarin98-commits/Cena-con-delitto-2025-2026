@@ -548,31 +548,7 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
     );
 
     const MasterPanel = ({ fase, onAvvia, onIndizio, onRivela, onReset, giocoAvviato }) => {
-      const [countdown, setCountdown] = useState(10);
-      const [releasing, setReleasing] = useState(false);
       const [showResetConfirm, setShowResetConfirm] = useState(false);
-
-      const handleRilasciaIndizio = () => {
-        if (fase >= 4) return;
-        setReleasing(true);
-        setCountdown(10);
-        
-        // Imposta il countdown end time per tutti
-        const endTime = Date.now() + 10000;
-        const state = getGameState();
-        setGameState({ ...state, countdownEnd: endTime });
-      };
-
-      useEffect(() => {
-        if (!releasing) return;
-        if (countdown <= 0) {
-          setReleasing(false);
-          onIndizio();
-          return;
-        }
-        const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-        return () => clearTimeout(timer);
-      }, [releasing, countdown, onIndizio]);
 
       return (
         <div className="bg-amber-900/30 border-2 border-amber-500 rounded-2xl p-3 mb-3">
@@ -597,11 +573,6 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
             <button onClick={onAvvia} className="w-full py-3 rounded-xl font-bold bg-green-600 text-white hover:bg-green-700 transition">
               🎬 AVVIA IL GIOCO
             </button>
-          ) : releasing ? (
-            <div className="text-center py-4">
-              <div className="text-5xl font-black text-amber-400 animate-pulse">{countdown}</div>
-              <p className="text-gray-300 text-sm mt-2">Rilascio indizio #{fase + 1}...</p>
-            </div>
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -613,7 +584,7 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
               </div>
               
               {fase < 4 ? (
-                <button onClick={handleRilasciaIndizio} className="w-full py-2 rounded-xl font-bold bg-purple-600 text-white hover:bg-purple-700 transition text-sm">
+                <button onClick={onIndizio} className="w-full py-2 rounded-xl font-bold bg-purple-600 text-white hover:bg-purple-700 transition text-sm">
                   📩 RILASCIA INDIZIO #{fase + 1}
                 </button>
               ) : (
@@ -750,32 +721,34 @@ CHI ha ucciso Briatore? CON COSA? PERCHÉ?`
 
       const handleIntroComplete = () => {
         setShowIntro(false);
-        const newState = { ...gameState, avviato: true };
+        const newState = { ...getGameState(), avviato: true };
         setGameState(newState);
         setLocalGameState(newState);
       };
 
-      const handleRilasciaIndizio = useCallback(() => {
-        if (fase >= 4) return;
-        const newState = { ...gameState, fase: fase + 1, countdownEnd: null };
+      const handleRilasciaIndizio = () => {
+        const currentState = getGameState();
+        if (currentState.fase >= 4) return;
+        const newFase = currentState.fase + 1;
+        const newState = { ...currentState, fase: newFase };
         setGameState(newState);
         setLocalGameState(newState);
-        setNotifica(`📩 Indizio #${fase + 1} rilasciato!`);
+        setNotifica(`📩 Indizio #${newFase} rilasciato!`);
         setTab('indizi');
         setTimeout(() => setNotifica(''), 4000);
-      }, [fase, gameState]);
+      };
 
       const handleCountdownComplete = useCallback(() => {
         setShowCountdown(false);
       }, []);
 
-      const handleReset = useCallback(() => {
+      const handleReset = () => {
         const newState = { fase: 0, avviato: false, countdownEnd: null };
         setGameState(newState);
         setLocalGameState(newState);
         setNotifica('🔄 Gioco resettato!');
         setTimeout(() => setNotifica(''), 3000);
-      }, []);
+      };
 
       // Schermata lettura scheda iniziale
       if (!letto) return (
